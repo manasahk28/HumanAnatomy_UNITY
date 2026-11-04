@@ -13,6 +13,8 @@ namespace HumanAnatomy
         public bool includeMuscles = true;
         public bool includeNervous = true;
         public bool includeCirculatory = true;
+        public bool includeRespiratory = true;
+        public bool includeDigestive = true;
 
         private void Start()
         {
@@ -65,6 +67,18 @@ namespace HumanAnatomy
             if (includeCirculatory)
             {
                 BuildCirculatorySystem(root.transform, litShader);
+            }
+
+            // 5. Build the full respiratory system
+            if (includeRespiratory)
+            {
+                BuildRespiratorySystem(root.transform, litShader);
+            }
+
+            // 6. Build the full digestive system
+            if (includeDigestive)
+            {
+                BuildDigestiveSystem(root.transform, litShader);
             }
 
             // Ensure Audio Feedback component exists on manager
@@ -174,83 +188,14 @@ namespace HumanAnatomy
         #region 5. Respiratory System
         private void BuildRespiratorySystem(Transform parent, Shader shader)
         {
-            GameObject group = new GameObject("RespiratorySystem");
-            group.transform.SetParent(parent, false);
-
-            Material lungMat = CreateColoredMaterial(shader, "LungMat", new Color(0.92f, 0.55f, 0.60f));
-            Material airwayMat = CreateColoredMaterial(shader, "AirwayMat", new Color(0.85f, 0.75f, 0.85f));
-
-            // Trachea (Windpipe)
-            CreatePart(group.transform, PrimitiveType.Cylinder, "Respiratory_Trachea",
-                new Vector3(0, 1.52f, 0.01f), new Vector3(0.04f, 0.12f, 0.04f),
-                airwayMat, AnatomySystemType.Respiratory, "Trachea (Windpipe)", "Trachea",
-                "Cartilaginous airway tube conducting air from larynx downward into right and left mainstem bronchi.",
-                "Reinforced by 16-20 C-shaped hyaline cartilage rings to prevent collapse during inspiration.",
-                new Vector3(0, 0.1f, 0.35f), true,
-                "Lined with pseudostratified ciliated columnar epithelium to sweep debris upward.",
-                "Bifurcates at the carina into primary bronchi.");
-
-            // Right Lung (3 lobes)
-            CreatePart(group.transform, PrimitiveType.Capsule, "Respiratory_RightLung",
-                new Vector3(0.13f, 1.33f, 0.01f), new Vector3(0.14f, 0.22f, 0.15f),
-                lungMat, AnatomySystemType.Respiratory, "Right Lung", "Pulmo Dexter",
-                "Primary organ of gas exchange; oxygenates venous blood and eliminates carbon dioxide waste.",
-                "Heavier and wider than the left lung, divided into 3 distinct lobes: Superior, Middle, and Inferior.",
-                new Vector3(0.45f, 0.1f, 0.2f), true,
-                "Contains hundreds of millions of microscopic alveoli providing ~70 m² surface area.",
-                "Receives deoxygenated blood from the pulmonary trunk.");
-
-            // Left Lung (2 lobes + cardiac notch)
-            CreatePart(group.transform, PrimitiveType.Capsule, "Respiratory_LeftLung",
-                new Vector3(-0.13f, 1.33f, 0.01f), new Vector3(0.13f, 0.21f, 0.14f),
-                lungMat, AnatomySystemType.Respiratory, "Left Lung", "Pulmo Sinister",
-                "Facilitates external pulmonary respiration alongside the right lung.",
-                "Features a medial cardiac notch to accommodate heart positioning, having 2 lobes: Superior and Inferior.",
-                new Vector3(-0.45f, 0.1f, 0.2f), true,
-                "Divided by an oblique fissure into two functional lobes.",
-                "Enclosed within the visceral and parietal pleural cavity.");
+            AnatomyRespiratoryGenerator.BuildFullRespiratorySystem(parent, shader);
         }
         #endregion
 
         #region 6. Digestive System
         private void BuildDigestiveSystem(Transform parent, Shader shader)
         {
-            GameObject group = new GameObject("DigestiveSystem");
-            group.transform.SetParent(parent, false);
-
-            Material liverMat = CreateColoredMaterial(shader, "LiverMat", new Color(0.62f, 0.24f, 0.18f));
-            Material stomachMat = CreateColoredMaterial(shader, "StomachMat", new Color(0.88f, 0.48f, 0.38f));
-            Material bowelMat = CreateColoredMaterial(shader, "BowelMat", new Color(0.82f, 0.62f, 0.48f));
-
-            // Liver
-            CreatePart(group.transform, PrimitiveType.Cube, "Digestive_Liver",
-                new Vector3(0.08f, 1.15f, 0.03f), new Vector3(0.20f, 0.13f, 0.16f),
-                liverMat, AnatomySystemType.Digestive, "Liver", "Hepar",
-                "Metabolic factory synthesizing plasma proteins, detoxifying biochemicals, and producing digestive bile.",
-                "The largest internal visceral organ (approx. 1.5 kg), capable of cellular tissue regeneration.",
-                new Vector3(0.35f, -0.1f, 0.35f), true,
-                "Receives dual blood supply from hepatic artery and hepatic portal vein.",
-                "Stores glycogen, vitamin reserves, and trace iron.");
-
-            // Stomach
-            CreatePart(group.transform, PrimitiveType.Sphere, "Digestive_Stomach",
-                new Vector3(-0.07f, 1.13f, 0.04f), new Vector3(0.15f, 0.12f, 0.13f),
-                stomachMat, AnatomySystemType.Digestive, "Stomach", "Gaster",
-                "Muscular reservoir initiating mechanical churn and enzymatic digestion of ingested nutrients.",
-                "Secretes gastric juice consisting of hydrochloric acid (pH 1.5 to 2.0) and pepsinogen.",
-                new Vector3(-0.35f, -0.1f, 0.35f), true,
-                "Features mucosal rugae folds that expand to hold 1 to 2 liters of food.",
-                "Empties semi-liquid chyme into the duodenum via pyloric sphincter.");
-
-            // Intestinal Tract (Small & Large Intestine)
-            CreatePart(group.transform, PrimitiveType.Cube, "Digestive_Intestines",
-                new Vector3(0, 0.98f, 0.03f), new Vector3(0.24f, 0.16f, 0.17f),
-                bowelMat, AnatomySystemType.Digestive, "Intestinal Tract", "Intestinum (Tenue et Crassum)",
-                "Principal site for nutrient digestion, carbohydrate/lipid absorption, electrolyte recovery, and water reabsorption.",
-                "Small intestine stretches approximately 6 meters; large intestine (colon) measures roughly 1.5 meters.",
-                new Vector3(0, -0.3f, 0.35f), true,
-                "Villi and microvilli expand nutrient absorptive surface to ~30 m².",
-                "Houses trillions of symbiotic gut microbiome bacteria essential for health.");
+            AnatomyDigestiveGenerator.BuildFullDigestiveSystem(parent, shader);
         }
         #endregion
 
@@ -346,9 +291,9 @@ namespace HumanAnatomy
                 new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(400, 0), new Vector2(280, 36));
             uiManager.searchInputField = searchBox.GetComponent<TMP_InputField>();
 
-            // System Quick Toggles (Skeletal, Muscular, Nervous, Circulatory)
+            // System Quick Toggles (Skeletal, Muscular, Nervous, Circulatory, Respiratory, Digestive)
             GameObject layerGroup = CreateUIPanel("LayerToggles", topHeader.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(30, 0), new Vector2(430, 36),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(620, 36),
                 Color.clear);
             HorizontalLayoutGroup lhlg = layerGroup.AddComponent<HorizontalLayoutGroup>();
             lhlg.spacing = 6;
@@ -361,6 +306,8 @@ namespace HumanAnatomy
             Button btnMusc = CreateToggleButton("Toggle_Musc", layerGroup.transform, "Muscular", new Color(0.42f, 0.18f, 0.22f), new Color(1f, 0.35f, 0.35f));
             Button btnNerv = CreateToggleButton("Toggle_Nerv", layerGroup.transform, "Nervous", new Color(0.40f, 0.34f, 0.15f), new Color(1f, 0.85f, 0.25f));
             Button btnCirc = CreateToggleButton("Toggle_Circ", layerGroup.transform, "Circulatory", new Color(0.44f, 0.16f, 0.22f), new Color(1f, 0.20f, 0.35f));
+            Button btnResp = CreateToggleButton("Toggle_Resp", layerGroup.transform, "Respiratory", new Color(0.18f, 0.40f, 0.35f), new Color(0.25f, 0.85f, 0.75f));
+            Button btnDig = CreateToggleButton("Toggle_Dig", layerGroup.transform, "Digestive", new Color(0.44f, 0.30f, 0.16f), new Color(1.0f, 0.65f, 0.20f));
 
             uiManager.toggleSkeletalButton = btnSkel;
             uiManager.skeletalIndicator = btnSkel.transform.Find("Indicator")?.GetComponent<Image>();
@@ -370,6 +317,10 @@ namespace HumanAnatomy
             uiManager.nervousIndicator = btnNerv.transform.Find("Indicator")?.GetComponent<Image>();
             uiManager.toggleCirculatoryButton = btnCirc;
             uiManager.circulatoryIndicator = btnCirc.transform.Find("Indicator")?.GetComponent<Image>();
+            uiManager.toggleRespiratoryButton = btnResp;
+            uiManager.respiratoryIndicator = btnResp.transform.Find("Indicator")?.GetComponent<Image>();
+            uiManager.toggleDigestiveButton = btnDig;
+            uiManager.digestiveIndicator = btnDig.transform.Find("Indicator")?.GetComponent<Image>();
 
             // Right side Top Controls: Explode Slider + Audio Button + Reset Button
             GameObject rightControls = CreateUIPanel("TopRightControls", topHeader.transform,
@@ -415,14 +366,14 @@ namespace HumanAnatomy
 
             // 2. LEFT PRESET FILTERS PANEL
             GameObject filterPanel = CreateUIPanel("FilterPanel", canvasObj.transform,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20, -90), new Vector2(185, 410),
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20, -90), new Vector2(185, 490),
                 new Color(0.08f, 0.10f, 0.14f, 0.90f));
 
             CreateTextElement("FilterHeader", filterPanel.transform, "<b>SYSTEM PRESETS</b>", 12, TextAlignmentOptions.Center,
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(165, 20));
 
             GameObject filterList = CreateUIPanel("FilterList", filterPanel.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(165, 360),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(165, 440),
                 Color.clear);
             VerticalLayoutGroup fvlg = filterList.AddComponent<VerticalLayoutGroup>();
             fvlg.spacing = 5;
@@ -431,8 +382,8 @@ namespace HumanAnatomy
             fvlg.childForceExpandHeight = true;
             fvlg.childForceExpandWidth = true;
 
-            string[] labels = { "All Systems", "Skeleton Only", "Muscles Only", "Nervous Only", "Circulatory Only", "Heart & Coronary", "Major Arteries", "Major Veins", "Brain & Cord", "Arm Nerves", "Leg Nerves" };
-            string[] modes = { "All", "Skeleton", "Muscles", "Nervous", "Circulatory", "Heart", "Arteries", "Veins", "BrainCord", "ArmNerves", "LegNerves" };
+            string[] labels = { "All Systems", "Skeleton Only", "Muscles Only", "Nervous Only", "Circulatory Only", "Respiratory Only", "Digestive Only", "Heart & Coronary", "Lungs & Airway", "Stomach & Liver", "Intestines", "Brain & Cord" };
+            string[] modes = { "All", "Skeleton", "Muscles", "Nervous", "Circulatory", "Respiratory", "Digestive", "Heart", "Lungs", "StomachLiver", "Intestines", "BrainCord" };
             for (int i = 0; i < labels.Length; i++)
             {
                 string m = modes[i];

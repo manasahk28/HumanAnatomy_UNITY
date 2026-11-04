@@ -124,6 +124,10 @@ namespace HumanAnatomy
                     return new Color(1.0f, 0.85f, 0.25f); // Electric Gold
                 case AnatomySystemType.Circulatory:
                     return new Color(1.0f, 0.20f, 0.35f); // Vivid Ruby / Crimson
+                case AnatomySystemType.Respiratory:
+                    return new Color(0.25f, 0.85f, 0.75f); // Cyan / Mint
+                case AnatomySystemType.Digestive:
+                    return new Color(1.0f, 0.65f, 0.20f); // Warm Amber Orange
                 default:
                     return Color.white;
             }

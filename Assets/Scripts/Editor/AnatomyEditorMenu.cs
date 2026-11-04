@@ -47,6 +47,8 @@ namespace HumanAnatomy.Editor
             builder.includeMuscles = true;
             builder.includeNervous = true;
             builder.includeCirculatory = true;
+            builder.includeRespiratory = true;
+            builder.includeDigestive = true;
 
             builder.BuildAnatomyModel();
 

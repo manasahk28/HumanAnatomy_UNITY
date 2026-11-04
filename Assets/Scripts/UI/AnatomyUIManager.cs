@@ -38,10 +38,14 @@ namespace HumanAnatomy
         public Button toggleMuscularButton;
         public Button toggleNervousButton;
         public Button toggleCirculatoryButton;
+        public Button toggleRespiratoryButton;
+        public Button toggleDigestiveButton;
         public Image skeletalIndicator;
         public Image muscularIndicator;
         public Image nervousIndicator;
         public Image circulatoryIndicator;
+        public Image respiratoryIndicator;
+        public Image digestiveIndicator;
 
         private void Start()
         {
@@ -129,6 +133,28 @@ namespace HumanAnatomy
                 });
             }
 
+            if (toggleRespiratoryButton != null)
+            {
+                toggleRespiratoryButton.onClick.AddListener(() => {
+                    if (explorerManager != null)
+                    {
+                        explorerManager.SetSystemVisible(AnatomySystemType.Respiratory, !explorerManager.isRespiratoryVisible);
+                        UpdateSystemIndicators();
+                    }
+                });
+            }
+
+            if (toggleDigestiveButton != null)
+            {
+                toggleDigestiveButton.onClick.AddListener(() => {
+                    if (explorerManager != null)
+                    {
+                        explorerManager.SetSystemVisible(AnatomySystemType.Digestive, !explorerManager.isDigestiveVisible);
+                        UpdateSystemIndicators();
+                    }
+                });
+            }
+
             UpdateSystemIndicators();
             HidePartInfo();
         }
@@ -158,6 +184,8 @@ namespace HumanAnatomy
                     AnatomySystemType.Muscular => "#FF453A",
                     AnatomySystemType.Nervous => "#FFD60A",
                     AnatomySystemType.Circulatory => "#FF2D55",
+                    AnatomySystemType.Respiratory => "#30D158",
+                    AnatomySystemType.Digestive => "#FF9F0A",
                     _ => "#FFFFFF"
                 };
                 systemBadgeText.text = $"<color={colorHex}>●</color> {part.data.systemType} System";
@@ -283,6 +311,20 @@ namespace HumanAnatomy
             {
                 circulatoryIndicator.color = explorerManager.isCirculatoryVisible
                     ? new Color(1f, 0.2f, 0.35f, 1f)
+                    : new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            }
+
+            if (respiratoryIndicator != null)
+            {
+                respiratoryIndicator.color = explorerManager.isRespiratoryVisible
+                    ? new Color(0.25f, 0.85f, 0.75f, 1f)
+                    : new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            }
+
+            if (digestiveIndicator != null)
+            {
+                digestiveIndicator.color = explorerManager.isDigestiveVisible
+                    ? new Color(1.0f, 0.65f, 0.20f, 1f)
                     : new Color(0.3f, 0.3f, 0.35f, 0.5f);
             }
         }

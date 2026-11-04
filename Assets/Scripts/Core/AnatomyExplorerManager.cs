@@ -22,6 +22,8 @@ namespace HumanAnatomy
         public bool isMuscularVisible = true;
         public bool isNervousVisible = true;
         public bool isCirculatoryVisible = true;
+        public bool isRespiratoryVisible = true;
+        public bool isDigestiveVisible = true;
 
         [Header("Raycast Settings")]
         public LayerMask anatomyLayer = ~0;
@@ -231,6 +233,8 @@ namespace HumanAnatomy
             else if (systemType == AnatomySystemType.Muscular) isMuscularVisible = visible;
             else if (systemType == AnatomySystemType.Nervous) isNervousVisible = visible;
             else if (systemType == AnatomySystemType.Circulatory) isCirculatoryVisible = visible;
+            else if (systemType == AnatomySystemType.Respiratory) isRespiratoryVisible = visible;
+            else if (systemType == AnatomySystemType.Digestive) isDigestiveVisible = visible;
 
             UpdateAllSystemsVisibility();
             AnatomyAudioFeedback.Instance?.PlayFilterSound();
@@ -253,6 +257,8 @@ namespace HumanAnatomy
                 else if (part.data.systemType == AnatomySystemType.Muscular) visible = isMuscularVisible;
                 else if (part.data.systemType == AnatomySystemType.Nervous) visible = isNervousVisible;
                 else if (part.data.systemType == AnatomySystemType.Circulatory) visible = isCirculatoryVisible;
+                else if (part.data.systemType == AnatomySystemType.Respiratory) visible = isRespiratoryVisible;
+                else if (part.data.systemType == AnatomySystemType.Digestive) visible = isDigestiveVisible;
 
                 part.SetVisibility(visible);
             }
@@ -412,6 +418,36 @@ namespace HumanAnatomy
                     bool isCirc = part.data.systemType == AnatomySystemType.Circulatory;
                     part.SetVisibility(isCirc);
                     part.SetDimmed(false);
+                }
+                else if (mode == "Respiratory")
+                {
+                    bool isResp = part.data.systemType == AnatomySystemType.Respiratory;
+                    part.SetVisibility(isResp);
+                    part.SetDimmed(false);
+                }
+                else if (mode == "Lungs")
+                {
+                    bool match = n.Contains("lung") || n.Contains("trachea") || n.Contains("bronch") || n.Contains("larynx");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
+                }
+                else if (mode == "Digestive")
+                {
+                    bool isDig = part.data.systemType == AnatomySystemType.Digestive;
+                    part.SetVisibility(isDig);
+                    part.SetDimmed(false);
+                }
+                else if (mode == "StomachLiver")
+                {
+                    bool match = n.Contains("stomach") || n.Contains("liver") || n.Contains("gallbladder") || n.Contains("pancreas") || n.Contains("esophagus");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
+                }
+                else if (mode == "Intestines")
+                {
+                    bool match = n.Contains("intestine") || n.Contains("colon") || n.Contains("cecum") || n.Contains("appendix") || n.Contains("rectum") || n.Contains("duodenum");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
                 }
                 else if (mode == "Heart")
                 {
