@@ -18,6 +18,9 @@ namespace HumanAnatomy
         public AnatomySystemType activeFilter = AnatomySystemType.All;
         public bool isExploded = false;
         public bool showGhostSilhouette = true;
+        public bool isSkeletalVisible = true;
+        public bool isMuscularVisible = true;
+        public bool isNervousVisible = true;
 
         [Header("Raycast Settings")]
         public LayerMask anatomyLayer = ~0;
@@ -26,10 +29,12 @@ namespace HumanAnatomy
         private AnatomyPart hoveredPart = null;
         private AnatomyPart selectedPart = null;
         private float explodedLerp = 0f;
+        private bool isExplodedControlledBySlider = false;
 
         public event Action<AnatomyPart> OnPartSelected;
         public event Action OnPartDeselected;
         public event Action<AnatomySystemType> OnFilterChanged;
+        public event Action<float> OnExplodeProgressChanged;
 
         private void Awake()
         {
@@ -63,6 +68,8 @@ namespace HumanAnatomy
 
         private void HandleExplodedTransition()
         {
+            if (isExplodedControlledBySlider) return;
+
             float target = isExploded ? 1f : 0f;
             if (Mathf.Abs(explodedLerp - target) > 0.001f)
             {
@@ -71,6 +78,7 @@ namespace HumanAnatomy
                 {
                     if (part != null) part.SetExplodedProgress(explodedLerp);
                 }
+                OnExplodeProgressChanged?.Invoke(explodedLerp);
             }
         }
 
@@ -100,6 +108,8 @@ namespace HumanAnatomy
                         ClearHover();
                         hoveredPart = hitPart;
                         hoveredPart.SetHovered(true);
+                        AnatomyTooltipUI.Instance?.ShowTooltip(hoveredPart);
+                        AnatomyAudioFeedback.Instance?.PlayHoverSound();
                     }
 
                     if (mouse.leftButton.wasPressedThisFrame)
@@ -125,6 +135,7 @@ namespace HumanAnatomy
             {
                 hoveredPart.SetHovered(false);
                 hoveredPart = null;
+                AnatomyTooltipUI.Instance?.HideTooltip();
             }
         }
 
@@ -142,6 +153,7 @@ namespace HumanAnatomy
             if (selectedPart != null)
             {
                 selectedPart.SetSelected(true);
+                AnatomyAudioFeedback.Instance?.PlaySelectSound();
                 OnPartSelected?.Invoke(selectedPart);
             }
             else
@@ -167,6 +179,7 @@ namespace HumanAnatomy
                 Bounds b = selectedPart.GetBounds();
                 float dist = Mathf.Max(b.size.x, b.size.y, b.size.z) * 2.8f;
                 cameraController.FocusOn(b.center, Mathf.Clamp(dist, 0.6f, 2.0f));
+                AnatomyAudioFeedback.Instance?.PlayWhooshSound();
             }
         }
 
@@ -175,12 +188,28 @@ namespace HumanAnatomy
             if (cameraController != null)
             {
                 cameraController.ResetView();
+                AnatomyAudioFeedback.Instance?.PlayWhooshSound();
             }
         }
 
         public void ToggleExplodedView()
         {
+            isExplodedControlledBySlider = false;
             isExploded = !isExploded;
+            AnatomyAudioFeedback.Instance?.PlayExplodeSound();
+        }
+
+        public void SetExplodeProgress(float progress)
+        {
+            isExplodedControlledBySlider = true;
+            explodedLerp = Mathf.Clamp01(progress);
+            isExploded = explodedLerp > 0.5f;
+
+            foreach (var part in allParts)
+            {
+                if (part != null) part.SetExplodedProgress(explodedLerp);
+            }
+            OnExplodeProgressChanged?.Invoke(explodedLerp);
         }
 
         public void SetGhostSilhouette(bool show)
@@ -195,9 +224,86 @@ namespace HumanAnatomy
             }
         }
 
+        public void SetSystemVisible(AnatomySystemType systemType, bool visible)
+        {
+            if (systemType == AnatomySystemType.Skeletal) isSkeletalVisible = visible;
+            else if (systemType == AnatomySystemType.Muscular) isMuscularVisible = visible;
+            else if (systemType == AnatomySystemType.Nervous) isNervousVisible = visible;
+
+            UpdateAllSystemsVisibility();
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
+        }
+
+        public void UpdateAllSystemsVisibility()
+        {
+            foreach (var part in allParts)
+            {
+                if (part == null) continue;
+
+                if (part.data.systemType == AnatomySystemType.Silhouette)
+                {
+                    part.SetVisibility(showGhostSilhouette);
+                    continue;
+                }
+
+                bool visible = true;
+                if (part.data.systemType == AnatomySystemType.Skeletal) visible = isSkeletalVisible;
+                else if (part.data.systemType == AnatomySystemType.Muscular) visible = isMuscularVisible;
+                else if (part.data.systemType == AnatomySystemType.Nervous) visible = isNervousVisible;
+
+                part.SetVisibility(visible);
+            }
+        }
+
+        public bool SearchAndSelectPart(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                foreach (var part in allParts)
+                {
+                    if (part != null) part.SetDimmed(false);
+                }
+                return false;
+            }
+
+            query = query.Trim().ToLower();
+            AnatomyPart bestMatch = null;
+
+            foreach (var part in allParts)
+            {
+                if (part == null || part.data.systemType == AnatomySystemType.Silhouette) continue;
+
+                string pName = part.data.partName?.ToLower() ?? "";
+                string sName = part.data.scientificName?.ToLower() ?? "";
+                string goName = part.gameObject.name.ToLower();
+
+                bool isMatch = pName.Contains(query) || sName.Contains(query) || goName.Contains(query);
+                if (isMatch)
+                {
+                    if (bestMatch == null) bestMatch = part;
+                    part.SetVisibility(true);
+                    part.SetDimmed(false);
+                }
+                else
+                {
+                    part.SetDimmed(true);
+                }
+            }
+
+            if (bestMatch != null)
+            {
+                SelectPart(bestMatch);
+                FocusOnSelected();
+                return true;
+            }
+
+            return false;
+        }
+
         public void ApplyFilter(AnatomySystemType systemType)
         {
             activeFilter = systemType;
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
 
             foreach (var part in allParts)
             {
@@ -221,7 +327,6 @@ namespace HumanAnatomy
                 }
                 else
                 {
-                    // Dim other systems or hide them
                     part.SetVisibility(true);
                     part.SetDimmed(true);
                 }
@@ -232,6 +337,7 @@ namespace HumanAnatomy
 
         public void FilterSkeletalRegion(string regionKeyword)
         {
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
             foreach (var part in allParts)
             {
                 if (part == null) continue;
@@ -269,6 +375,7 @@ namespace HumanAnatomy
 
         public void FilterMusculoskeletal(string mode)
         {
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
             foreach (var part in allParts)
             {
                 if (part == null) continue;
@@ -336,6 +443,7 @@ namespace HumanAnatomy
         public void IsolateCurrentSelected()
         {
             if (selectedPart == null) return;
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
 
             foreach (var part in allParts)
             {
@@ -353,4 +461,3 @@ namespace HumanAnatomy
         }
     }
 }
-

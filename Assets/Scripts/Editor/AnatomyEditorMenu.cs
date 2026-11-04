@@ -39,6 +39,9 @@ namespace HumanAnatomy.Editor
             if (manager == null) manager = mgrObj.AddComponent<AnatomyExplorerManager>();
             if (cam != null) manager.mainCamera = cam;
 
+            AnatomyAudioFeedback audio = mgrObj.GetComponent<AnatomyAudioFeedback>();
+            if (audio == null) audio = mgrObj.AddComponent<AnatomyAudioFeedback>();
+
             AnatomySceneBuilder builder = mgrObj.GetComponent<AnatomySceneBuilder>();
             if (builder == null) builder = mgrObj.AddComponent<AnatomySceneBuilder>();
             builder.includeMuscles = true;

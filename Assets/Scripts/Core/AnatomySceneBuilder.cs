@@ -32,6 +32,13 @@ namespace HumanAnatomy
                 else DestroyImmediate(existing.gameObject);
             }
 
+            // Clean up existing canvas in editor mode so UI updates take effect
+            if (!Application.isPlaying)
+            {
+                GameObject oldCanvas = GameObject.Find("AnatomyCanvas");
+                if (oldCanvas != null) DestroyImmediate(oldCanvas);
+            }
+
             GameObject root = new GameObject("HumanBodyRoot");
             root.transform.SetParent(transform, false);
 
@@ -51,6 +58,12 @@ namespace HumanAnatomy
             if (includeNervous)
             {
                 BuildNervousSystem(root.transform, litShader);
+            }
+
+            // Ensure Audio Feedback component exists on manager
+            if (GetComponent<AnatomyAudioFeedback>() == null)
+            {
+                gameObject.AddComponent<AnatomyAudioFeedback>();
             }
 
             // Ensure UI exists
@@ -341,61 +354,127 @@ namespace HumanAnatomy
             GameObject canvasObj = new GameObject("AnatomyCanvas");
             Canvas canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasObj.AddComponent<CanvasScaler>();
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
             canvasObj.AddComponent<GraphicRaycaster>();
 
             AnatomyUIManager uiManager = canvasObj.AddComponent<AnatomyUIManager>();
 
-            // Title Banner
-            GameObject titleObj = CreateTextElement("TitleText", canvasObj.transform,
-                "<b>HUMAN ANATOMY 3D — SKELETAL, MUSCULAR & NERVOUS SYSTEMS</b>", 17, TextAlignmentOptions.TopLeft,
-                new Vector2(0, 1), new Vector2(0, 1), new Vector2(25, -25), new Vector2(620, 45));
+            // 1. TOP HEADER BAR
+            GameObject topHeader = CreateUIPanel("TopHeaderBar", canvasObj.transform,
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0, -32), new Vector2(0, 56),
+                new Color(0.08f, 0.10f, 0.14f, 0.92f));
 
-            // System Filter Buttons Panel
+            // App Title
+            CreateTextElement("AppTitle", topHeader.transform,
+                "<b>HUMAN ANATOMY 3D</b>", 17, TextAlignmentOptions.Left,
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(25, 0), new Vector2(240, 36));
+
+            // Search Bar in Top Bar
+            GameObject searchBox = CreateSearchBox("SearchInput", topHeader.transform,
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(400, 0), new Vector2(280, 36));
+            uiManager.searchInputField = searchBox.GetComponent<TMP_InputField>();
+
+            // System Quick Toggles (Skeletal, Muscular, Nervous)
+            GameObject layerGroup = CreateUIPanel("LayerToggles", topHeader.transform,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(50, 0), new Vector2(330, 36),
+                Color.clear);
+            HorizontalLayoutGroup lhlg = layerGroup.AddComponent<HorizontalLayoutGroup>();
+            lhlg.spacing = 6;
+            lhlg.childControlHeight = true;
+            lhlg.childControlWidth = true;
+            lhlg.childForceExpandHeight = true;
+            lhlg.childForceExpandWidth = true;
+
+            Button btnSkel = CreateToggleButton("Toggle_Skel", layerGroup.transform, "Skeletal", new Color(0.18f, 0.28f, 0.42f), new Color(0.35f, 0.78f, 1f));
+            Button btnMusc = CreateToggleButton("Toggle_Musc", layerGroup.transform, "Muscular", new Color(0.42f, 0.18f, 0.22f), new Color(1f, 0.35f, 0.35f));
+            Button btnNerv = CreateToggleButton("Toggle_Nerv", layerGroup.transform, "Nervous", new Color(0.40f, 0.34f, 0.15f), new Color(1f, 0.85f, 0.25f));
+
+            uiManager.toggleSkeletalButton = btnSkel;
+            uiManager.skeletalIndicator = btnSkel.transform.Find("Indicator")?.GetComponent<Image>();
+            uiManager.toggleMuscularButton = btnMusc;
+            uiManager.muscularIndicator = btnMusc.transform.Find("Indicator")?.GetComponent<Image>();
+            uiManager.toggleNervousButton = btnNerv;
+            uiManager.nervousIndicator = btnNerv.transform.Find("Indicator")?.GetComponent<Image>();
+
+            // Right side Top Controls: Explode Slider + Audio Button + Reset Button
+            GameObject rightControls = CreateUIPanel("TopRightControls", topHeader.transform,
+                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-20, 0), new Vector2(420, 38),
+                Color.clear);
+            HorizontalLayoutGroup rhlg = rightControls.AddComponent<HorizontalLayoutGroup>();
+            rhlg.spacing = 10;
+            rhlg.childControlHeight = true;
+            rhlg.childControlWidth = false;
+            rhlg.childForceExpandHeight = true;
+            rhlg.childForceExpandWidth = false;
+
+            // Explode Slider Container
+            GameObject sliderContainer = CreateUIPanel("ExplodeContainer", rightControls.transform,
+                Vector2.zero, Vector2.one, Vector2.zero, new Vector2(210, 36),
+                new Color(0.12f, 0.15f, 0.20f, 0.85f));
+            LayoutElement sliderLe = sliderContainer.AddComponent<LayoutElement>();
+            sliderLe.preferredWidth = 210;
+
+            CreateTextElement("ExplodeLabel", sliderContainer.transform, "Explode:", 12, TextAlignmentOptions.Left,
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(8, 0), new Vector2(50, 24));
+
+            GameObject sliderObj = CreateSliderElement("Slider", sliderContainer.transform,
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(110, 0), new Vector2(95, 18));
+            uiManager.explodeSlider = sliderObj.GetComponent<Slider>();
+
+            TextMeshProUGUI valText = CreateTextElement("ValText", sliderContainer.transform, "0%", 11, TextAlignmentOptions.Right,
+                new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-6, 0), new Vector2(35, 20)).GetComponent<TextMeshProUGUI>();
+            uiManager.explodeValueText = valText;
+
+            // Audio Mute Button
+            Button muteBtn = CreateButton("Btn_Mute", rightControls.transform, "Audio: ON", 12, new Color(0.22f, 0.32f, 0.44f));
+            LayoutElement muteLe = muteBtn.gameObject.AddComponent<LayoutElement>();
+            muteLe.preferredWidth = 90;
+            uiManager.muteButton = muteBtn;
+            uiManager.muteButtonText = muteBtn.transform.Find("Label")?.GetComponent<TextMeshProUGUI>();
+
+            // Reset Camera Button
+            Button resetBtn = CreateButton("Btn_ResetCam", rightControls.transform, "Reset View", 12, new Color(0.22f, 0.32f, 0.44f));
+            LayoutElement resetLe = resetBtn.gameObject.AddComponent<LayoutElement>();
+            resetLe.preferredWidth = 85;
+            uiManager.resetCamButton = resetBtn;
+
+            // 2. LEFT PRESET FILTERS PANEL
             GameObject filterPanel = CreateUIPanel("FilterPanel", canvasObj.transform,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -35), new Vector2(920, 45),
-                new Color(0.1f, 0.12f, 0.16f, 0.85f));
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20, -90), new Vector2(180, 290),
+                new Color(0.08f, 0.10f, 0.14f, 0.90f));
 
-            HorizontalLayoutGroup hlg = filterPanel.AddComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 8;
-            hlg.childControlHeight = true;
-            hlg.childControlWidth = true;
-            hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth = true;
-            hlg.padding = new RectOffset(6, 6, 6, 6);
+            CreateTextElement("FilterHeader", filterPanel.transform, "<b>SYSTEM PRESETS</b>", 12, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(160, 20));
+
+            GameObject filterList = CreateUIPanel("FilterList", filterPanel.transform,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(160, 240),
+                Color.clear);
+            VerticalLayoutGroup fvlg = filterList.AddComponent<VerticalLayoutGroup>();
+            fvlg.spacing = 6;
+            fvlg.childControlHeight = true;
+            fvlg.childControlWidth = true;
+            fvlg.childForceExpandHeight = true;
+            fvlg.childForceExpandWidth = true;
 
             string[] labels = { "All Systems", "Skeleton Only", "Muscles Only", "Nervous Only", "Brain & Cord", "Arm Nerves", "Leg Nerves" };
             string[] modes = { "All", "Skeleton", "Muscles", "Nervous", "BrainCord", "ArmNerves", "LegNerves" };
             for (int i = 0; i < labels.Length; i++)
             {
                 string m = modes[i];
-                Button btn = CreateButton($"Btn_{m}", filterPanel.transform, labels[i], 12,
-                    new Color(0.2f, 0.25f, 0.35f, 0.9f));
+                Button btn = CreateButton($"Btn_{m}", filterList.transform, labels[i], 11, new Color(0.18f, 0.22f, 0.30f, 0.95f));
                 btn.onClick.AddListener(() => {
                     AnatomyExplorerManager mgr = FindAnyObjectByType<AnatomyExplorerManager>();
                     if (mgr != null) mgr.FilterMusculoskeletal(m);
                 });
             }
 
-            // Exploded View & Reset Camera Buttons
-            GameObject controlPanel = CreateUIPanel("ControlPanel", canvasObj.transform,
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-15, -35), new Vector2(260, 45),
-                new Color(0.1f, 0.12f, 0.16f, 0.85f));
-            HorizontalLayoutGroup chlg = controlPanel.AddComponent<HorizontalLayoutGroup>();
-            chlg.spacing = 8;
-            chlg.childControlHeight = true;
-            chlg.childControlWidth = true;
-            chlg.padding = new RectOffset(6, 6, 6, 6);
-
-            Button explodeBtn = CreateButton("Btn_Explode", controlPanel.transform, "Explode", 14, new Color(0.35f, 0.45f, 0.7f));
-            Button resetBtn = CreateButton("Btn_ResetCam", controlPanel.transform, "Reset View", 14, new Color(0.35f, 0.45f, 0.7f));
-            uiManager.explodedButton = explodeBtn;
-            uiManager.resetCamButton = resetBtn;
-
-            // Info Card (Right Side)
+            // 3. RIGHT INFO CARD
             GameObject infoCard = CreateUIPanel("InfoPanel", canvasObj.transform,
                 new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-20, 0), new Vector2(360, 520),
-                new Color(0.08f, 0.10f, 0.14f, 0.92f));
+                new Color(0.08f, 0.10f, 0.14f, 0.94f));
             uiManager.infoPanel = infoCard;
 
             // Info Card Header
@@ -403,7 +482,7 @@ namespace HumanAnatomy
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -35), new Vector2(340, 60),
                 new Color(0.16f, 0.22f, 0.32f, 0.95f));
 
-            uiManager.titleText = CreateTextElement("PartTitle", headerBg.transform, "Organ Name", 20, TextAlignmentOptions.Left,
+            uiManager.titleText = CreateTextElement("PartTitle", headerBg.transform, "Organ Name", 19, TextAlignmentOptions.Left,
                 new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(15, 8), new Vector2(240, 26)).GetComponent<TextMeshProUGUI>();
 
             uiManager.scientificText = CreateTextElement("ScientificName", headerBg.transform, "(Organum)", 13, TextAlignmentOptions.Left,
@@ -415,7 +494,7 @@ namespace HumanAnatomy
             RectTransform closeRt = closeBtn.GetComponent<RectTransform>();
             closeRt.anchorMin = closeRt.anchorMax = new Vector2(1, 0.5f);
             closeRt.anchoredPosition = new Vector2(-22, 0);
-            closeRt.sizeDelta = new Vector2(32, 32);
+            closeRt.sizeDelta = new Vector2(30, 30);
             uiManager.closeInfoButton = closeBtn;
 
             // System Badge
@@ -438,25 +517,217 @@ namespace HumanAnatomy
             uiManager.factsText.color = new Color(1f, 0.9f, 0.6f);
 
             // Action Buttons
-            Button focusBtn = CreateButton("FocusBtn", infoCard.transform, "Focus Camera", 14, new Color(0.2f, 0.55f, 0.8f));
+            Button focusBtn = CreateButton("FocusBtn", infoCard.transform, "Focus Camera", 13, new Color(0.2f, 0.55f, 0.8f));
             RectTransform focusRt = focusBtn.GetComponent<RectTransform>();
             focusRt.anchorMin = focusRt.anchorMax = new Vector2(0.3f, 0.08f);
             focusRt.anchoredPosition = Vector2.zero;
             focusRt.sizeDelta = new Vector2(140, 36);
             uiManager.focusButton = focusBtn;
 
-            Button isolateBtn = CreateButton("IsolateBtn", infoCard.transform, "Isolate Part", 14, new Color(0.3f, 0.65f, 0.4f));
+            Button isolateBtn = CreateButton("IsolateBtn", infoCard.transform, "Isolate Part", 13, new Color(0.3f, 0.65f, 0.4f));
             RectTransform isoRt = isolateBtn.GetComponent<RectTransform>();
             isoRt.anchorMin = isoRt.anchorMax = new Vector2(0.72f, 0.08f);
             isoRt.anchoredPosition = Vector2.zero;
             isoRt.sizeDelta = new Vector2(140, 36);
             uiManager.isolateButton = isolateBtn;
 
-            // Bottom Navigation Hint
+            // 4. INTERACTIVE TOOLTIP
+            CreateTooltipUI(canvasObj.transform);
+
+            // 5. BOTTOM NAVIGATION HINT
             CreateTextElement("HintText", canvasObj.transform,
-                "<b>Controls:</b> Left Mouse Drag = Orbit | Right Mouse Drag = Pan | Scroll = Zoom | Left Click = Inspect Organ",
-                13, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(800, 30));
+                "<b>Controls:</b> Left Mouse Drag = Orbit | Right Mouse Drag = Pan | Scroll = Zoom | Left Click = Select & Inspect | Hover = Tooltip",
+                12, TextAlignmentOptions.Center,
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 18), new Vector2(900, 26));
+        }
+
+        private void CreateTooltipUI(Transform canvasTransform)
+        {
+            GameObject tooltipObj = new GameObject("AnatomyTooltip", typeof(RectTransform));
+            tooltipObj.transform.SetParent(canvasTransform, false);
+            RectTransform rt = tooltipObj.GetComponent<RectTransform>();
+            rt.pivot = new Vector2(0, 1);
+            rt.sizeDelta = new Vector2(230, 78);
+
+            CanvasGroup cg = tooltipObj.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+
+            Image bg = tooltipObj.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.08f, 0.12f, 0.94f);
+
+            Outline outline = tooltipObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.35f, 0.55f, 0.85f, 0.5f);
+            outline.effectDistance = new Vector2(1, -1);
+
+            AnatomyTooltipUI tooltip = tooltipObj.AddComponent<AnatomyTooltipUI>();
+            tooltip.tooltipRect = rt;
+            tooltip.canvasGroup = cg;
+
+            // Title
+            GameObject nameObj = CreateTextElement("PartName", tooltipObj.transform, "Part Name", 14, TextAlignmentOptions.Left,
+                new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -14), new Vector2(-20, 20));
+            tooltip.nameText = nameObj.GetComponent<TextMeshProUGUI>();
+
+            // System
+            GameObject sysObj = CreateTextElement("SystemBadge", tooltipObj.transform, "● Skeletal System", 11, TextAlignmentOptions.Left,
+                new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -34), new Vector2(-20, 18));
+            tooltip.systemText = sysObj.GetComponent<TextMeshProUGUI>();
+
+            // Function
+            GameObject fnObj = CreateTextElement("Function", tooltipObj.transform, "Primary function info...", 11, TextAlignmentOptions.Left,
+                new Vector2(0, 1), new Vector2(1, 1), new Vector2(10, -54), new Vector2(-20, 18));
+            fnObj.GetComponent<TextMeshProUGUI>().color = new Color(0.8f, 0.85f, 0.9f);
+            tooltip.functionText = fnObj.GetComponent<TextMeshProUGUI>();
+        }
+
+        private GameObject CreateSearchBox(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size)
+        {
+            GameObject searchObj = new GameObject(name, typeof(RectTransform));
+            searchObj.transform.SetParent(parent, false);
+            RectTransform rt = searchObj.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+
+            Image bg = searchObj.AddComponent<Image>();
+            bg.color = new Color(0.14f, 0.17f, 0.23f, 0.95f);
+
+            Outline ol = searchObj.AddComponent<Outline>();
+            ol.effectColor = new Color(0.25f, 0.35f, 0.5f, 0.6f);
+            ol.effectDistance = new Vector2(1, -1);
+
+            TMP_InputField input = searchObj.AddComponent<TMP_InputField>();
+
+            // Text Area
+            GameObject textArea = new GameObject("TextArea", typeof(RectTransform));
+            textArea.transform.SetParent(searchObj.transform, false);
+            RectTransform areaRt = textArea.GetComponent<RectTransform>();
+            areaRt.anchorMin = Vector2.zero;
+            areaRt.anchorMax = Vector2.one;
+            areaRt.offsetMin = new Vector2(10, 2);
+            areaRt.offsetMax = new Vector2(-10, -2);
+            textArea.AddComponent<RectMask2D>();
+
+            // Placeholder Text
+            GameObject placeholderObj = CreateTextElement("Placeholder", textArea.transform, "Search anatomy...", 12, TextAlignmentOptions.Left,
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            TextMeshProUGUI placeholderTmp = placeholderObj.GetComponent<TextMeshProUGUI>();
+            placeholderTmp.color = new Color(0.6f, 0.65f, 0.75f, 0.6f);
+            RectTransform prt = placeholderObj.GetComponent<RectTransform>();
+            prt.offsetMin = Vector2.zero;
+            prt.offsetMax = Vector2.zero;
+
+            // Main Text
+            GameObject textObj = CreateTextElement("Text", textArea.transform, "", 12, TextAlignmentOptions.Left,
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            TextMeshProUGUI textTmp = textObj.GetComponent<TextMeshProUGUI>();
+            textTmp.color = Color.white;
+            RectTransform trt = textObj.GetComponent<RectTransform>();
+            trt.offsetMin = Vector2.zero;
+            trt.offsetMax = Vector2.zero;
+
+            input.textViewport = areaRt;
+            input.textComponent = textTmp;
+            input.placeholder = placeholderTmp;
+
+            return searchObj;
+        }
+
+        private GameObject CreateSliderElement(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size)
+        {
+            GameObject sliderObj = new GameObject(name, typeof(RectTransform));
+            sliderObj.transform.SetParent(parent, false);
+            RectTransform rt = sliderObj.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+
+            Slider slider = sliderObj.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+
+            // Background
+            GameObject bgObj = new GameObject("Background", typeof(RectTransform));
+            bgObj.transform.SetParent(sliderObj.transform, false);
+            RectTransform bgRt = bgObj.GetComponent<RectTransform>();
+            bgRt.anchorMin = new Vector2(0, 0.35f);
+            bgRt.anchorMax = new Vector2(1, 0.65f);
+            bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
+            Image bgImg = bgObj.AddComponent<Image>();
+            bgImg.color = new Color(0.2f, 0.25f, 0.32f);
+
+            // Fill Area
+            GameObject fillArea = new GameObject("FillArea", typeof(RectTransform));
+            fillArea.transform.SetParent(sliderObj.transform, false);
+            RectTransform faRt = fillArea.GetComponent<RectTransform>();
+            faRt.anchorMin = new Vector2(0, 0.35f);
+            faRt.anchorMax = new Vector2(1, 0.65f);
+            faRt.offsetMin = new Vector2(5, 0);
+            faRt.offsetMax = new Vector2(-5, 0);
+
+            GameObject fill = new GameObject("Fill", typeof(RectTransform));
+            fill.transform.SetParent(fillArea.transform, false);
+            RectTransform fillRt = fill.GetComponent<RectTransform>();
+            fillRt.offsetMin = fillRt.offsetMax = Vector2.zero;
+            Image fillImg = fill.AddComponent<Image>();
+            fillImg.color = new Color(0.35f, 0.65f, 1f);
+
+            // Handle Slide Area
+            GameObject handleArea = new GameObject("HandleSlideArea", typeof(RectTransform));
+            handleArea.transform.SetParent(sliderObj.transform, false);
+            RectTransform haRt = handleArea.GetComponent<RectTransform>();
+            haRt.anchorMin = Vector2.zero;
+            haRt.anchorMax = Vector2.one;
+            haRt.offsetMin = new Vector2(10, 0);
+            haRt.offsetMax = new Vector2(-10, 0);
+
+            GameObject handle = new GameObject("Handle", typeof(RectTransform));
+            handle.transform.SetParent(handleArea.transform, false);
+            RectTransform handleRt = handle.GetComponent<RectTransform>();
+            handleRt.sizeDelta = new Vector2(16, 16);
+            Image handleImg = handle.AddComponent<Image>();
+            handleImg.color = Color.white;
+
+            slider.fillRect = fillRt;
+            slider.handleRect = handleRt;
+            slider.targetGraphic = handleImg;
+            slider.direction = Slider.Direction.LeftToRight;
+
+            return sliderObj;
+        }
+
+        private Button CreateToggleButton(string name, Transform parent, string label, Color bgColor, Color dotColor)
+        {
+            GameObject btnObj = new GameObject(name, typeof(RectTransform));
+            btnObj.transform.SetParent(parent, false);
+
+            Image img = btnObj.AddComponent<Image>();
+            img.color = bgColor;
+
+            Button btn = btnObj.AddComponent<Button>();
+
+            // Dot Indicator
+            GameObject dotObj = new GameObject("Indicator", typeof(RectTransform));
+            dotObj.transform.SetParent(btnObj.transform, false);
+            RectTransform dotRt = dotObj.GetComponent<RectTransform>();
+            dotRt.anchorMin = dotRt.anchorMax = new Vector2(0, 0.5f);
+            dotRt.anchoredPosition = new Vector2(12, 0);
+            dotRt.sizeDelta = new Vector2(8, 8);
+            Image dotImg = dotObj.AddComponent<Image>();
+            dotImg.color = dotColor;
+
+            // Label
+            GameObject textObj = CreateTextElement("Label", btnObj.transform, label, 11, TextAlignmentOptions.Left,
+                new Vector2(0, 0), new Vector2(1, 1), Vector2.zero, Vector2.zero);
+            RectTransform textRt = textObj.GetComponent<RectTransform>();
+            textRt.offsetMin = new Vector2(24, 0);
+            textRt.offsetMax = Vector2.zero;
+
+            return btn;
         }
 
         private GameObject CreateUIPanel(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, Color color)
