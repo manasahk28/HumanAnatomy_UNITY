@@ -12,6 +12,7 @@ namespace HumanAnatomy
         public bool skeletonOnly = false;
         public bool includeMuscles = true;
         public bool includeNervous = true;
+        public bool includeCirculatory = true;
 
         private void Start()
         {
@@ -58,6 +59,12 @@ namespace HumanAnatomy
             if (includeNervous)
             {
                 BuildNervousSystem(root.transform, litShader);
+            }
+
+            // 4. Build the full circulatory system
+            if (includeCirculatory)
+            {
+                BuildCirculatorySystem(root.transform, litShader);
             }
 
             // Ensure Audio Feedback component exists on manager
@@ -160,45 +167,7 @@ namespace HumanAnatomy
         #region 4. Circulatory System
         private void BuildCirculatorySystem(Transform parent, Shader shader)
         {
-            GameObject group = new GameObject("CirculatorySystem");
-            group.transform.SetParent(parent, false);
-
-            Material heartMat = CreateColoredMaterial(shader, "HeartMat", new Color(0.85f, 0.15f, 0.22f));
-            Material arteryMat = CreateColoredMaterial(shader, "ArteryMat", new Color(0.92f, 0.22f, 0.22f));
-            Material veinMat = CreateColoredMaterial(shader, "VeinMat", new Color(0.20f, 0.45f, 0.85f));
-
-            // Heart
-            AnatomyPart heartPart = CreatePart(group.transform, PrimitiveType.Sphere, "Circulatory_Heart",
-                new Vector3(-0.04f, 1.34f, 0.02f), new Vector3(0.14f, 0.16f, 0.13f),
-                heartMat, AnatomySystemType.Circulatory, "Human Heart", "Cor",
-                "Muscular organ maintaining systemic and pulmonary blood circulation via continuous cyclical contractions.",
-                "Pumps roughly 5 liters of blood per minute through a vascular network extending over 100,000 kilometers.",
-                new Vector3(-0.25f, 0.1f, 0.45f), true,
-                "Four chambers: Right & Left Atria, Right & Left Ventricles.",
-                "Has intrinsic cardiac conduction pacing (Sinoatrial node).");
-            heartPart.hasHeartbeatPulse = true;
-            heartPart.pulseMagnitude = 0.05f;
-            heartPart.pulseSpeed = 1.1f;
-
-            // Aorta
-            CreatePart(group.transform, PrimitiveType.Cylinder, "Circulatory_Aorta",
-                new Vector3(-0.02f, 1.38f, -0.01f), new Vector3(0.03f, 0.14f, 0.03f),
-                arteryMat, AnatomySystemType.Circulatory, "Aortic Arch & Descending Aorta", "Aorta",
-                "Main trunk of systemic arterial circulation conveying oxygenated blood from the left cardiac ventricle.",
-                "Withstands blood pressure peaks averaging 120 mmHg, utilizing elastic recoil (Windkessel effect).",
-                new Vector3(-0.1f, 0.15f, 0.35f), true,
-                "Arches superiorly before descending along the anterior aspect of the thoracic spine.",
-                "Branches supply the head, arms, thoracic viscera, and abdominal organs.");
-
-            // Vena Cava
-            CreatePart(group.transform, PrimitiveType.Cylinder, "Circulatory_VenaCava",
-                new Vector3(0.03f, 1.33f, -0.01f), new Vector3(0.032f, 0.18f, 0.032f),
-                veinMat, AnatomySystemType.Circulatory, "Vena Cava (Superior & Inferior)", "Vena Cava",
-                "Primary venous channels collecting deoxygenated blood from the upper and lower body to the right atrium.",
-                "Low-pressure vascular conduits reliant on muscle pump action and thoracic pressure gradients for venous return.",
-                new Vector3(0.1f, 0.15f, 0.35f), true,
-                "Superior Vena Cava drains head, neck, and upper limbs.",
-                "Inferior Vena Cava is the widest vein in the human body.");
+            AnatomyCirculatoryGenerator.BuildFullCirculatorySystem(parent, shader);
         }
         #endregion
 
@@ -377,9 +346,9 @@ namespace HumanAnatomy
                 new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(400, 0), new Vector2(280, 36));
             uiManager.searchInputField = searchBox.GetComponent<TMP_InputField>();
 
-            // System Quick Toggles (Skeletal, Muscular, Nervous)
+            // System Quick Toggles (Skeletal, Muscular, Nervous, Circulatory)
             GameObject layerGroup = CreateUIPanel("LayerToggles", topHeader.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(50, 0), new Vector2(330, 36),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(30, 0), new Vector2(430, 36),
                 Color.clear);
             HorizontalLayoutGroup lhlg = layerGroup.AddComponent<HorizontalLayoutGroup>();
             lhlg.spacing = 6;
@@ -391,6 +360,7 @@ namespace HumanAnatomy
             Button btnSkel = CreateToggleButton("Toggle_Skel", layerGroup.transform, "Skeletal", new Color(0.18f, 0.28f, 0.42f), new Color(0.35f, 0.78f, 1f));
             Button btnMusc = CreateToggleButton("Toggle_Musc", layerGroup.transform, "Muscular", new Color(0.42f, 0.18f, 0.22f), new Color(1f, 0.35f, 0.35f));
             Button btnNerv = CreateToggleButton("Toggle_Nerv", layerGroup.transform, "Nervous", new Color(0.40f, 0.34f, 0.15f), new Color(1f, 0.85f, 0.25f));
+            Button btnCirc = CreateToggleButton("Toggle_Circ", layerGroup.transform, "Circulatory", new Color(0.44f, 0.16f, 0.22f), new Color(1f, 0.20f, 0.35f));
 
             uiManager.toggleSkeletalButton = btnSkel;
             uiManager.skeletalIndicator = btnSkel.transform.Find("Indicator")?.GetComponent<Image>();
@@ -398,6 +368,8 @@ namespace HumanAnatomy
             uiManager.muscularIndicator = btnMusc.transform.Find("Indicator")?.GetComponent<Image>();
             uiManager.toggleNervousButton = btnNerv;
             uiManager.nervousIndicator = btnNerv.transform.Find("Indicator")?.GetComponent<Image>();
+            uiManager.toggleCirculatoryButton = btnCirc;
+            uiManager.circulatoryIndicator = btnCirc.transform.Find("Indicator")?.GetComponent<Image>();
 
             // Right side Top Controls: Explode Slider + Audio Button + Reset Button
             GameObject rightControls = CreateUIPanel("TopRightControls", topHeader.transform,
@@ -443,24 +415,24 @@ namespace HumanAnatomy
 
             // 2. LEFT PRESET FILTERS PANEL
             GameObject filterPanel = CreateUIPanel("FilterPanel", canvasObj.transform,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20, -90), new Vector2(180, 290),
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20, -90), new Vector2(185, 410),
                 new Color(0.08f, 0.10f, 0.14f, 0.90f));
 
             CreateTextElement("FilterHeader", filterPanel.transform, "<b>SYSTEM PRESETS</b>", 12, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(160, 20));
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -16), new Vector2(165, 20));
 
             GameObject filterList = CreateUIPanel("FilterList", filterPanel.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(160, 240),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -12), new Vector2(165, 360),
                 Color.clear);
             VerticalLayoutGroup fvlg = filterList.AddComponent<VerticalLayoutGroup>();
-            fvlg.spacing = 6;
+            fvlg.spacing = 5;
             fvlg.childControlHeight = true;
             fvlg.childControlWidth = true;
             fvlg.childForceExpandHeight = true;
             fvlg.childForceExpandWidth = true;
 
-            string[] labels = { "All Systems", "Skeleton Only", "Muscles Only", "Nervous Only", "Brain & Cord", "Arm Nerves", "Leg Nerves" };
-            string[] modes = { "All", "Skeleton", "Muscles", "Nervous", "BrainCord", "ArmNerves", "LegNerves" };
+            string[] labels = { "All Systems", "Skeleton Only", "Muscles Only", "Nervous Only", "Circulatory Only", "Heart & Coronary", "Major Arteries", "Major Veins", "Brain & Cord", "Arm Nerves", "Leg Nerves" };
+            string[] modes = { "All", "Skeleton", "Muscles", "Nervous", "Circulatory", "Heart", "Arteries", "Veins", "BrainCord", "ArmNerves", "LegNerves" };
             for (int i = 0; i < labels.Length; i++)
             {
                 string m = modes[i];

@@ -122,6 +122,8 @@ namespace HumanAnatomy
                     return new Color(1.0f, 0.35f, 0.35f); // Crimson
                 case AnatomySystemType.Nervous:
                     return new Color(1.0f, 0.85f, 0.25f); // Electric Gold
+                case AnatomySystemType.Circulatory:
+                    return new Color(1.0f, 0.20f, 0.35f); // Vivid Ruby / Crimson
                 default:
                     return Color.white;
             }

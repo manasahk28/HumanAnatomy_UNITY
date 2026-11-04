@@ -37,9 +37,11 @@ namespace HumanAnatomy
         public Button toggleSkeletalButton;
         public Button toggleMuscularButton;
         public Button toggleNervousButton;
+        public Button toggleCirculatoryButton;
         public Image skeletalIndicator;
         public Image muscularIndicator;
         public Image nervousIndicator;
+        public Image circulatoryIndicator;
 
         private void Start()
         {
@@ -116,6 +118,17 @@ namespace HumanAnatomy
                 });
             }
 
+            if (toggleCirculatoryButton != null)
+            {
+                toggleCirculatoryButton.onClick.AddListener(() => {
+                    if (explorerManager != null)
+                    {
+                        explorerManager.SetSystemVisible(AnatomySystemType.Circulatory, !explorerManager.isCirculatoryVisible);
+                        UpdateSystemIndicators();
+                    }
+                });
+            }
+
             UpdateSystemIndicators();
             HidePartInfo();
         }
@@ -144,6 +157,7 @@ namespace HumanAnatomy
                     AnatomySystemType.Skeletal => "#5AC8FA",
                     AnatomySystemType.Muscular => "#FF453A",
                     AnatomySystemType.Nervous => "#FFD60A",
+                    AnatomySystemType.Circulatory => "#FF2D55",
                     _ => "#FFFFFF"
                 };
                 systemBadgeText.text = $"<color={colorHex}>●</color> {part.data.systemType} System";
@@ -262,6 +276,13 @@ namespace HumanAnatomy
             {
                 nervousIndicator.color = explorerManager.isNervousVisible
                     ? new Color(1f, 0.85f, 0.2f, 1f)
+                    : new Color(0.3f, 0.3f, 0.35f, 0.5f);
+            }
+
+            if (circulatoryIndicator != null)
+            {
+                circulatoryIndicator.color = explorerManager.isCirculatoryVisible
+                    ? new Color(1f, 0.2f, 0.35f, 1f)
                     : new Color(0.3f, 0.3f, 0.35f, 0.5f);
             }
         }

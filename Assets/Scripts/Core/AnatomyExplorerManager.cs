@@ -18,6 +18,10 @@ namespace HumanAnatomy
         public AnatomySystemType activeFilter = AnatomySystemType.All;
         public bool isExploded = false;
         public bool showGhostSilhouette = true;
+        public bool isSkeletalVisible = true;
+        public bool isMuscularVisible = true;
+        public bool isNervousVisible = true;
+        public bool isCirculatoryVisible = true;
 
         [Header("Raycast Settings")]
         public LayerMask anatomyLayer = ~0;
@@ -26,10 +30,12 @@ namespace HumanAnatomy
         private AnatomyPart hoveredPart = null;
         private AnatomyPart selectedPart = null;
         private float explodedLerp = 0f;
+        private bool isExplodedControlledBySlider = false;
 
         public event Action<AnatomyPart> OnPartSelected;
         public event Action OnPartDeselected;
         public event Action<AnatomySystemType> OnFilterChanged;
+        public event Action<float> OnExplodeProgressChanged;
 
         private void Awake()
         {
@@ -63,6 +69,8 @@ namespace HumanAnatomy
 
         private void HandleExplodedTransition()
         {
+            if (isExplodedControlledBySlider) return;
+
             float target = isExploded ? 1f : 0f;
             if (Mathf.Abs(explodedLerp - target) > 0.001f)
             {
@@ -71,6 +79,7 @@ namespace HumanAnatomy
                 {
                     if (part != null) part.SetExplodedProgress(explodedLerp);
                 }
+                OnExplodeProgressChanged?.Invoke(explodedLerp);
             }
         }
 
@@ -171,6 +180,7 @@ namespace HumanAnatomy
                 Bounds b = selectedPart.GetBounds();
                 float dist = Mathf.Max(b.size.x, b.size.y, b.size.z) * 2.8f;
                 cameraController.FocusOn(b.center, Mathf.Clamp(dist, 0.6f, 2.0f));
+                AnatomyAudioFeedback.Instance?.PlayWhooshSound();
             }
         }
 
@@ -179,12 +189,28 @@ namespace HumanAnatomy
             if (cameraController != null)
             {
                 cameraController.ResetView();
+                AnatomyAudioFeedback.Instance?.PlayWhooshSound();
             }
         }
 
         public void ToggleExplodedView()
         {
+            isExplodedControlledBySlider = false;
             isExploded = !isExploded;
+            AnatomyAudioFeedback.Instance?.PlayExplodeSound();
+        }
+
+        public void SetExplodeProgress(float progress)
+        {
+            isExplodedControlledBySlider = true;
+            explodedLerp = Mathf.Clamp01(progress);
+            isExploded = explodedLerp > 0.5f;
+
+            foreach (var part in allParts)
+            {
+                if (part != null) part.SetExplodedProgress(explodedLerp);
+            }
+            OnExplodeProgressChanged?.Invoke(explodedLerp);
         }
 
         public void SetGhostSilhouette(bool show)
@@ -199,9 +225,88 @@ namespace HumanAnatomy
             }
         }
 
+        public void SetSystemVisible(AnatomySystemType systemType, bool visible)
+        {
+            if (systemType == AnatomySystemType.Skeletal) isSkeletalVisible = visible;
+            else if (systemType == AnatomySystemType.Muscular) isMuscularVisible = visible;
+            else if (systemType == AnatomySystemType.Nervous) isNervousVisible = visible;
+            else if (systemType == AnatomySystemType.Circulatory) isCirculatoryVisible = visible;
+
+            UpdateAllSystemsVisibility();
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
+        }
+
+        public void UpdateAllSystemsVisibility()
+        {
+            foreach (var part in allParts)
+            {
+                if (part == null) continue;
+
+                if (part.data.systemType == AnatomySystemType.Silhouette)
+                {
+                    part.SetVisibility(showGhostSilhouette);
+                    continue;
+                }
+
+                bool visible = true;
+                if (part.data.systemType == AnatomySystemType.Skeletal) visible = isSkeletalVisible;
+                else if (part.data.systemType == AnatomySystemType.Muscular) visible = isMuscularVisible;
+                else if (part.data.systemType == AnatomySystemType.Nervous) visible = isNervousVisible;
+                else if (part.data.systemType == AnatomySystemType.Circulatory) visible = isCirculatoryVisible;
+
+                part.SetVisibility(visible);
+            }
+        }
+
+        public bool SearchAndSelectPart(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                foreach (var part in allParts)
+                {
+                    if (part != null) part.SetDimmed(false);
+                }
+                return false;
+            }
+
+            query = query.Trim().ToLower();
+            AnatomyPart bestMatch = null;
+
+            foreach (var part in allParts)
+            {
+                if (part == null || part.data.systemType == AnatomySystemType.Silhouette) continue;
+
+                string pName = part.data.partName?.ToLower() ?? "";
+                string sName = part.data.scientificName?.ToLower() ?? "";
+                string goName = part.gameObject.name.ToLower();
+
+                bool isMatch = pName.Contains(query) || sName.Contains(query) || goName.Contains(query);
+                if (isMatch)
+                {
+                    if (bestMatch == null) bestMatch = part;
+                    part.SetVisibility(true);
+                    part.SetDimmed(false);
+                }
+                else
+                {
+                    part.SetDimmed(true);
+                }
+            }
+
+            if (bestMatch != null)
+            {
+                SelectPart(bestMatch);
+                FocusOnSelected();
+                return true;
+            }
+
+            return false;
+        }
+
         public void ApplyFilter(AnatomySystemType systemType)
         {
             activeFilter = systemType;
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
 
             foreach (var part in allParts)
             {
@@ -225,7 +330,6 @@ namespace HumanAnatomy
                 }
                 else
                 {
-                    // Dim other systems or hide them
                     part.SetVisibility(true);
                     part.SetDimmed(true);
                 }
@@ -236,6 +340,7 @@ namespace HumanAnatomy
 
         public void FilterSkeletalRegion(string regionKeyword)
         {
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
             foreach (var part in allParts)
             {
                 if (part == null) continue;
@@ -251,11 +356,11 @@ namespace HumanAnatomy
                     if (regionKeyword == "Axial")
                         match = n.Contains("skull") || n.Contains("spine") || n.Contains("mandible") || n.Contains("sacrum") || n.Contains("cord");
                     else if (regionKeyword == "Thorax")
-                        match = n.Contains("rib") || n.Contains("sternum");
+                        match = n.Contains("rib") || n.Contains("sternum") || n.Contains("heart") || n.Contains("aorta");
                     else if (regionKeyword == "Upper")
-                        match = n.Contains("clavicle") || n.Contains("scapula") || n.Contains("humerus") || n.Contains("radius") || n.Contains("ulna") || n.Contains("hand");
+                        match = n.Contains("clavicle") || n.Contains("scapula") || n.Contains("humerus") || n.Contains("radius") || n.Contains("ulna") || n.Contains("hand") || n.Contains("brachial");
                     else if (regionKeyword == "Lower")
-                        match = n.Contains("pelvis") || n.Contains("femur") || n.Contains("patella") || n.Contains("tibia") || n.Contains("fibula") || n.Contains("foot");
+                        match = n.Contains("pelvis") || n.Contains("femur") || n.Contains("patella") || n.Contains("tibia") || n.Contains("fibula") || n.Contains("foot") || n.Contains("saphenous");
 
                     if (match)
                     {
@@ -273,9 +378,12 @@ namespace HumanAnatomy
 
         public void FilterMusculoskeletal(string mode)
         {
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
             foreach (var part in allParts)
             {
                 if (part == null) continue;
+                string n = part.gameObject.name.ToLower();
+
                 if (mode == "All")
                 {
                     part.SetVisibility(true);
@@ -293,43 +401,50 @@ namespace HumanAnatomy
                     part.SetVisibility(isMusc);
                     part.SetDimmed(false);
                 }
-                else if (mode == "UpperMuscles")
-                {
-                    string n = part.gameObject.name.ToLower();
-                    bool match = n.Contains("pectoralis") || n.Contains("deltoid") || n.Contains("biceps") || n.Contains("triceps") || n.Contains("forearm") || n.Contains("trapezius") || n.Contains("latissimus");
-                    part.SetVisibility(true);
-                    part.SetDimmed(!match);
-                }
-                else if (mode == "LowerMuscles")
-                {
-                    string n = part.gameObject.name.ToLower();
-                    bool match = n.Contains("abdominis") || n.Contains("oblique") || n.Contains("gluteal") || n.Contains("quadriceps") || n.Contains("hamstring") || n.Contains("gastrocnemius");
-                    part.SetVisibility(true);
-                    part.SetDimmed(!match);
-                }
                 else if (mode == "Nervous")
                 {
                     bool isNerv = part.data.systemType == AnatomySystemType.Nervous;
                     part.SetVisibility(isNerv);
                     part.SetDimmed(false);
                 }
+                else if (mode == "Circulatory")
+                {
+                    bool isCirc = part.data.systemType == AnatomySystemType.Circulatory;
+                    part.SetVisibility(isCirc);
+                    part.SetDimmed(false);
+                }
+                else if (mode == "Heart")
+                {
+                    bool match = n.Contains("heart") || n.Contains("atrium") || n.Contains("ventricle") || n.Contains("coronary") || n.Contains("lad");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
+                }
+                else if (mode == "Arteries")
+                {
+                    bool match = n.Contains("aorta") || n.Contains("artery") || n.Contains("carotid") || n.Contains("brachial") || n.Contains("femoral") || n.Contains("radial") || n.Contains("tibial") || n.Contains("iliac") || n.Contains("pulm_");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
+                }
+                else if (mode == "Veins")
+                {
+                    bool match = n.Contains("vena") || n.Contains("cava") || n.Contains("jugular") || n.Contains("saphenous") || n.Contains("vein") || n.Contains("sinus") || n.Contains("basilic") || n.Contains("cephalic");
+                    part.SetVisibility(true);
+                    part.SetDimmed(!match);
+                }
                 else if (mode == "BrainCord")
                 {
-                    string n = part.gameObject.name.ToLower();
                     bool match = n.Contains("brain") || n.Contains("lobe") || n.Contains("cerebellum") || n.Contains("cord") || n.Contains("cauda") || n.Contains("sympathetic");
                     part.SetVisibility(true);
                     part.SetDimmed(!match);
                 }
                 else if (mode == "ArmNerves")
                 {
-                    string n = part.gameObject.name.ToLower();
                     bool match = n.Contains("plexus") || n.Contains("radial") || n.Contains("median") || n.Contains("ulnar");
                     part.SetVisibility(true);
                     part.SetDimmed(!match);
                 }
                 else if (mode == "LegNerves")
                 {
-                    string n = part.gameObject.name.ToLower();
                     bool match = n.Contains("femoral") || n.Contains("sciatic") || n.Contains("tibial") || n.Contains("fibular");
                     part.SetVisibility(true);
                     part.SetDimmed(!match);
@@ -340,6 +455,7 @@ namespace HumanAnatomy
         public void IsolateCurrentSelected()
         {
             if (selectedPart == null) return;
+            AnatomyAudioFeedback.Instance?.PlayFilterSound();
 
             foreach (var part in allParts)
             {
@@ -357,4 +473,3 @@ namespace HumanAnatomy
         }
     }
 }
-

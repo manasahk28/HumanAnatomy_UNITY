@@ -46,6 +46,7 @@ namespace HumanAnatomy.Editor
             if (builder == null) builder = mgrObj.AddComponent<AnatomySceneBuilder>();
             builder.includeMuscles = true;
             builder.includeNervous = true;
+            builder.includeCirculatory = true;
 
             builder.BuildAnatomyModel();
 
